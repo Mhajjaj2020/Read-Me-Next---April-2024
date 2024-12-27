@@ -1,0 +1,397 @@
+---
+title: "Final Project: Progress Report"
+date: 03/28/2024
+
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+    theme: flatly
+---
+
+# Overview
+
+> In this progress report, you'll show some intermediate results of your final project. (Note: This milestone is considered as part of the project management. The grades are only tentative. You should focus on getting some progress. Your final project outcome will outweight the intermediate results.)
+
+0. (5%) Fill the basic information
+
+    * Project title: {ReadMeNext}
+    * Repository: {https://github.com/class-data-mining-master/2024-spring-dm-project-2024-spring-team-2-readmenext.git}
+    * Team member(s): {replace the following with your member information}
+        Diab, Ahmad (ahd23@pitt.edu)
+        Hajjaj, Mohammad (moh33@pitt.edu)
+
+1. (40%) Extend your abstract, describe your project in more details. It should be 300--500 words in length providing:
+    + your project goal, or the problem you plan to work on; 
+    + (motivation and significance) why the problem is interesting and/or important; 
+    + the approach you plan to take, including what data mining tasks you will perform, and what potential techniques you will try; 
+    + what dataset you plan to use and how you will get the data (if the data is publicly available, provide the exact reference to the data; otherwise, provide a description about the data source).
+
+2. (30%) Give some preliminary description or analysis about your dataset(s). You should have early numbers or a figure in this report. This part can be short or long, depending on your actual progress. 
+
+3. (25%) The following questions are design to help you manage the progress in doing the final project. Your answers don't need to be long or detailed but will show that you have a plan to address them in your final report.
+    a) What do you try to accomplish in this project? What have you done so far?
+    b) What are the strengths/novelty of your proposed idea? Why is the problem challenging?
+    c) How will you evaluate your method(s)? What are the performance measures and baseline methods?
+    d) Have you found any the research or works related to your project/problem/data? Where do you find the related work? 
+    e) Are there any challenges you encounter so far? How do you plan to solve it?
+
+
+```{r document_setup, echo=F, message=F, warning=F}
+# This chunk can include things you need for the rest of the document
+library('ggplot2') ## most of the time you will need ggplot
+library('tidyverse')
+library(lubridate) ##  handling date and time data
+library(tm) ## Text Mining Infrastructure
+library(quanteda)
+
+library(wordcloud) ## used for  visually summarizing text data
+library(RColorBrewer)##effective way to access a wide range of color palettes for use in data visualization
+library(naniar)
+theme_set(theme_bw()) # change the default ggplot theme to black-and-white
+
+knitr::opts_chunk$set(
+  echo=T, ## show your R code chunk
+  message = F, ## hide the message
+  warning = F, ## hide the warning
+  autodep = T ## make sure your separate code chunks can find the dependencies (from other code chunk)
+)
+```
+  
+
+# 0. Fill the basic information
+
+    * Project title: ReadMeNext
+    * Repository: https://github.com/class-data-mining-master/2024-spring-dm-project-2024-spring-team-2-readmenext.git
+    * Team member(s):
+        Diab, Ahmad (ahd23@pitt.edu)
+        Hajjaj, Mohammad (moh33@pitt.edu)
+
+
+# 1. Extended abstract 
+This project addresses the challenges associated with predicting the quality and reading appeal of books. Accurate models capable of discerning high-quality reading materials on platforms like GoodReads have the potential to revolutionize user experiences, saving time, bolstering platform credibility, and benefiting authors and publishers alike. Ultimately, this initiative aims to enrich the book discovery and reading journey for all users involved. Our proposed system, ReadMeNext, leverages a multitude of user-generated attributes, including reviews text, sentiment of the text, reading duration, and user engagement, to offer quality suggestions and recommendations for reading materials. Through this endeavor, we not only aim to empower the scientific community with actionable insights but also raise the bar for research quality across the field.
+
+This project utilizes a dataset sourced from GoodReads [1], comprising a vast repository of 900k records, each representing a unique book review. Our research starts with the transformation of this dataset, reshaping it so that each record now encapsulates a single unique book (N=~25K), consolidating all user-generated information pertaining to that specific book. These diverse information sets for each book will be encoded and concatenated to construct a comprehensive vector representation for the book. The dimensionality of these features within the vector will be determined empirically. In this project, we deploy a spectrum of models, including SVM, Linear Regression, KNN, Decision Tree, Random Forest, XGBoost, and Neural Network. Each model will be trained on the designated dataset, with the primary objective of discerning whether a book merits the classification of 'worth reading' (good book) or 'not worth reading' (bad book). Our selection of models is underpinned by insights obtained from our literature review [2,3,4].
+
+
+# 2. Preliminary results
+Please check the end of this report for the visual analysis.
+
+
+# 3. Your answers to Problem 3.
+[a] In this project, our primary goal is to investigate the feasibility of predicting book's quality based on user-generated data, including attributes such as review text, sentiment, reading duration, number of reviews, and unique user engagement. Previous research has predominantly focused on factors like author popularity [2] and basic book attributes [4] such as title, page count, and language. However, when user reviews are considered, existing studies often overlook the content, instead relying solely on sentiment analysis [3] or review count [2,4]. Other lines of research explored the reviews to judge their credibility [5] or impact on the popularity of a book [6]. Our research seeks to bridge this gap by incorporating the semantics, content, and sentiment of user reviews into the assessment of a book's recommendation value, alongside other pertinent user-generated attributes. We aim to provide a more comprehensive understanding of how these factors contribute to the perceived worthiness of a book recommendation.
+
+To date, our efforts have been centered on a thorough review of existing literature to ensure the novelty of our approach, accompanied by a concise list of relevant references. Additionally, we have conducted an initial exploration of the dataset's statistics to inform our research direction. Furthermore, we have reshaped the data to align with our research objectives and outlined the methodologies we intend to employ based on the insights gleaned from the literature review. Moving forward, our next steps involve applying these methodologies to the dataset, evaluating their performance, and subsequently synthesizing our findings into a coherent research paper.
+
+[b] The novelty of our proposed idea lies in our approach to feature selection. While previous research primarily relied on author or book attributes to predict the quality of a book recommendation, we pivot our focus to the users themselves. Drawing inspiration from findings in [], which emphasize the significant impact of user-generated reviews in assessing a book's worth, we aim to leverage this rich source of data to address the same question.
+
+However, the problem we face is not without its challenges. One major obstacle is the variability in the number of reviews for each book in our dataset. Additionally, the content of these reviews may contain noise, which can complicate the task of accurately assessing the quality of a book. Furthermore, the subjective nature of reviews adds another layer of complexity, as each review reflects the unique perspective and experience of its author, potentially introducing bias into our analysis.
+
+[c] To evaluate our methods, we will rely on a ground truth derived from the overall reviews of books. We conducted a thorough analysis by examining 10 different best-recommendation lists across various genres on the GoodReads website, each comprising 100 different books. Our observation revealed that all books on these lists had an average rating of 3.5 or above. Therefore, we define a book as "good" if its overall rating is 3.5 or higher. 
+
+To assess the performance of our methods, we will employ standard evaluation metrics including Accuracy, Precision, Recall, F1-score, and Area Under the Curve (AUC). By utilizing a diverse set of metrics, we aim to provide a comprehensive comparison of the performance of our techniques, thereby highlighting their respective strengths and weaknesses.
+
+[d] Our research uses a publicly available dataset sourced from Kaggle, originally compiled from the GoodReads website. To identify relevant literature, we initiated our search by focusing on studies that utilized this specific dataset. Subsequently, we expanded our search to encompass a broader range of papers that address similar research questions, particularly those pertaining to the recommendation of good books for reading purposes. We conducted our literature review using the Google Scholar platform, leveraging its extensive database to identify scholarly works that align with the objectives and scope of our research project.
+
+
+[e] One of the primary challenges we've encountered in our research is related to the definition of what constitutes a "good book." Previous studies relied on metrics such as a book's appearance on bestseller lists or its inclusion in "To Read" shelves on GoodReads website. However, we contend that these measures may not capture the full spectrum of high-quality literature, as certain noteworthy books may not achieve widespread commercial success, while others may be subject to subjective biases in user-generated lists. This challenge introduces a level of complexity to our research, as it necessitates a nuanced understanding of what defines a "good book" in the context of our study. To address this issue, we will compare our raw results alongside the outcomes reported in existing research. Additionally, we will perform a validity check by applying some of the metrics (i.e. book appearance in bestseller lists) used in previous studies to evaluate the performance of our model. By adopting this approach, we aim to gain insights into how our methodology and findings align with established research in the field, thus ensuring the robustness and reliability of our results.
+
+
+
+# References
+[1] https://www.kaggle.com/competitions/goodreads-books-reviews-290312/data
+
+[2] Wijaya, Rachel Anastasia, et al. "Prediction Model of Book Popularity from Goodreads “To Read” and “Worst” Books." 2023 10th International Conference on ICT for Smart Society (ICISS). IEEE, 2023.
+
+[3] Maity, Suman Kalyan, Abhishek Panigrahi, and Animesh Mukherjee. "Book reading behavior on goodreads can predict the amazon best sellers." Proceedings of the 2017 IEEE/ACM International Conference on Advances in Social Networks Analysis and Mining 2017. 2017.
+
+[4] Maghari, Alaa Mazen, et al. "Books’ rating prediction using just neural network." (2020).
+
+[5] Hajibayova, Lala. "Investigation of Goodreads’ reviews: Kakutanied, deceived or simply honest?." Journal of Documentation 75.3 (2019): 612-626.
+
+[6] Kousha, Kayvan, Mike Thelwall, and Mahshid Abdoli. "Goodreads reviews to assess the wider impacts of books." Journal of the Association for Information Science and Technology 68.8 (2017): 2004-2016.
+
+
+
+```{r}
+df_data <- 'goodreads_train.csv'
+
+dataset <- readr::read_csv(df_data)#,  col_names = TRUE, na = c('NA', '?'))
+```
+
+```{r}
+glimpse(dataset)
+```
+```{r}
+head(dataset, 5
+     )
+```
+
+## Missing (NA) Values
+```{r}
+summary(dataset)
+
+colSums(is.na(dataset))
+```
+
+```{r}
+
+vis_miss(dataset, warn_large_data = FALSE)
+```
+ We can see we have less than 5% of  missing variables.
+ 
+ ## Clean the missing variables:
+ 
+```{r}
+
+
+Clean_dataset <- dataset %>%
+  mutate(across(where(is.character), ~na_if(., "?")),
+         across(where(is.character), ~na_if(., "")))
+
+```
+## Preprosses the NA values
+
+```{r}
+original_nrow <- nrow(Clean_dataset)
+original_nrow
+```
+
+
+ 
+ 
+##
+```{r}
+dim(Clean_dataset)
+```
+
+## Convert Identifiers to Categorical Data
+```{r}
+Clean_dataset <- Clean_dataset %>%
+  mutate(
+    user_id = as.factor(user_id),
+    book_id = as.factor(book_id),
+    review_id = as.factor(review_id)
+  )
+
+```
+
+```{r}
+Clean_dataset <- Clean_dataset %>%
+  filter(!is.na(read_at) & !is.na(started_at))
+
+```
+## summary numaric data
+
+```{r, warning = F}
+Clean_dataset %>%
+  summarise(
+    Rating_Summary = summary(rating),
+    Votes_Summary = summary(n_votes),
+    Comments_Summary = summary(n_comments)
+  )
+```
+
+## count usres:
+```{r}
+unique_users <- Clean_dataset %>%
+  summarise(unique_users = n_distinct(user_id)) %>%
+  pull(unique_users)
+unique_users
+```
+The number of unique users providing reviews is 11610 users.
+```{r}
+unique_books <- Clean_dataset %>%
+  summarise(unique_books = n_distinct(book_id)) %>%
+  pull(unique_books)
+unique_books
+```
+The total number of unique books is 25421 books.
+
+
+## Data Analysis and Visualization:
+
+## Histogram of ratings:
+
+```{r}
+Clean_dataset |>
+  mutate(rating = factor(rating, levels = c(1, 2, 3, 4, 5))) %>%
+  ggplot(aes(x = rating)) +
+  geom_histogram(stat = "count", fill="blue", color="black") +
+  labs(title="Distribution of of single review Rating", x="Rating", y="Count") +
+  scale_x_discrete(drop = FALSE) +  
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+```{r}
+Clean_dataset |>
+   mutate(rating = factor(rating, levels = c(1, 2, 3, 4, 5))) %>%
+  filter(!is.na(rating)) %>%  
+  count(rating) %>%  
+  mutate(percent = n / sum(n) * 100) %>% 
+ 
+  ggplot(aes(x = rating, y = n, label = sprintf("%.1f%%", percent))) +  
+  geom_bar(stat = "identity", fill = "blue", color = "black") +
+  geom_text(vjust = -0.5, size = 3) +  
+  labs(title = "Distribution of single review Rating - percentage", x = "Rating", y = "Count") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+   
+
+```
+
+## Histogram of votes:
+
+```{r}
+Clean_dataset |>
+ggplot( aes(x=n_votes)) +
+  geom_histogram(fill="green", color="black") +
+  labs(title="Distribution of Votes", x="Number of Votes", y="Count")
+
+```
+Most of the reviews do not have votes. We hypothesize that this feature will not be influential in our model.
+
+
+## Distribution of Comments
+
+
+```{r}
+Clean_dataset |>
+ggplot( aes(x=n_comments)) +
+  geom_histogram(fill="blue", color="black") +
+  labs(title="Distribution comments", x="number of commentss", y="Count")
+```
+Most of the reviews do not have comments from other users. We hypothesize that this feature will not be influential in our model.
+
+## Time analysis of "start_reading" books
+
+```{r}
+Clean_dataset <- Clean_dataset %>%
+  mutate(
+    date_added = parse_date_time(date_added, orders = "a b d H:M:S z Y"),
+    date_updated = parse_date_time(date_updated, orders = "a b d H:M:S z Y"),
+    read_at = parse_date_time(read_at, orders = "a b d H:M:S z Y"),
+    started_at = parse_date_time(started_at, orders = "a b d H:M:S z Y")
+  )
+```
+
+```{r}
+year_range <- range(Clean_dataset %>%
+  mutate(year = as.integer(year(date_added))) %>%
+  .$year)
+
+
+Clean_dataset |>
+  mutate(year = as.integer(year(date_added))) %>%
+  group_by(year) %>%
+  summarise(count = n()) %>%
+  ggplot(aes(x = year, y = count)) +  
+  geom_line(color = "blue")+
+  scale_x_continuous(breaks = seq(year_range[1], year_range[2], by = 1)) + 
+  labs(title = "Time of start reading each book", x = "Year", y = "Count",color = "Your Legend Title") +
+ 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+## Top 10 Most Reviewed Books
+
+```{r}
+
+Clean_dataset %>%
+  group_by(book_id) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  top_n(10, count) %>%
+  ggplot(aes(x=reorder(as.factor(book_id), count), y=count, fill=count)) +
+  geom_bar(stat="identity") +
+  scale_fill_viridis_c() +
+  coord_flip() +
+  labs(title="Top 10 Reviewed Books", x="Book ID", y="Number of Reviews", fill="Review Count") +
+  theme_minimal() +
+  theme(legend.position="bottom",
+        text = element_text(size=12),
+        axis.text.y = element_text(angle=45, hjust=1))
+
+```                             
+
+## WordCloud of the Most Frequent Words in Reviews
+
+```{r}
+set.seed(123)
+subset_size <- 10000 
+Clean_dataset_subset <- Clean_dataset %>%
+  dplyr::slice_sample(n = subset_size)
+
+
+corpus = Corpus(VectorSource(Clean_dataset_subset$review_text))
+corpus = tm_map(corpus, content_transformer(tolower))
+corpus = tm_map(corpus, removePunctuation)
+corpus = tm_map(corpus, removeNumbers)
+corpus = tm_map(corpus, removeWords, stopwords("english"))
+
+
+tdm = TermDocumentMatrix(corpus)
+
+
+word_freqs <- slam::row_sums(tdm, na.rm = TRUE)
+word_freqs_sorted <- sort(word_freqs, decreasing = TRUE)
+
+
+wordcloud(words = names(word_freqs_sorted), 
+          freq = word_freqs_sorted,
+          max.words = 50, 
+          random.order = FALSE, 
+          colors = brewer.pal(10, "Dark2"))
+
+```
+We note that these words are related to evaluating the content of a book, which is a good indication to use the text as basis in our methodology.
+
+##  correlation analysis:
+
+```{r}
+
+library(dplyr)
+library(ggplot2)
+library(reshape2)  # Make sure this package is installed and loaded
+
+# Selecting the numerical data
+numerical_data <- dataset %>% select(rating, n_votes, n_comments)
+
+# Calculating the correlation matrix
+cor_matrix <- cor(numerical_data, use = "complete.obs")
+
+# Melt the correlation matrix into a long format
+cor_data <- melt(cor_matrix)
+
+# Now cor_data is defined and you can proceed to plot it
+cor_plot <- cor_data %>%
+  ggplot(aes(x = Var1, y = Var2, fill = value)) + 
+    geom_tile(color = "white") + 
+    geom_text(aes(label = round(value, 2)), color = "black", size = 4) + 
+    scale_fill_gradient2(
+      low = "blue", 
+      high = "red", 
+      mid = "white", 
+      midpoint = 0, 
+      limits = c(-1, 1),
+      space = "Lab", 
+      name = "Pearson Correlation"
+    ) +
+    theme_minimal() +
+    theme(
+      axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1, size = 12),
+      axis.text.y = element_text(size = 12),
+      legend.title = element_text(size = 12),
+      legend.text = element_text(size = 10)
+    ) +
+    coord_fixed() +
+    labs(x = NULL, y = NULL)
+
+# Print the plot
+print(cor_plot)
+
+
+```

@@ -1,0 +1,528 @@
+---
+title: "Final Project: Progress Report"
+author: "Ahmad Diab", "mohammad Hajjaj"
+
+date: "03/28/2024"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+    theme: flatly
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r document_setup, echo=F, message=F, warning=F}
+# This chunk can include things you need for the rest of the document
+library('ggplot2') ## most of the time you will need ggplot
+library("tidyverse")
+library(rsample)
+library(tidymodels)
+library(caret)
+library(e1071) 
+library(nnet)
+library(class)
+library(rpart)
+library(randomForest)
+library(pROC)
+library(caretEnsemble)
+library(vip)
+library(lubridate) ##  handling date and time data
+library(tm) ## Text Mining Infrastructure
+library(quanteda)
+library(wordcloud) ## used for  visually summarizing text data
+library(RColorBrewer)##effective way to access a wide range of color palettes for use in data visualization
+library(naniar)
+library(themis)
+library(rsample)
+library(doParallel)
+
+theme_set(theme_bw()) # change the default ggplot theme to black-and-white
+
+knitr::opts_chunk$set(
+  echo=T, ## show your R code chunk
+  message = F, ## hide the message
+  warning = F, ## hide the warning
+  autodep = T ## make sure your separate code chunks can find the dependencies (from other code chunk)
+)
+```
+
+## R Markdown
+Load Data
+```{r}
+df_data <- 'full_dataset.csv'
+
+df <- readr::read_csv(df_data)
+```
+#1 Exploratory Data Analysis (EDA):
+# 1.1 Basic data overview:
+```{r}
+head(df)
+```
+Quick summary statistics of the data set:
+
+```{r}
+summary(df)
+
+```
+Quick data types check :
+
+```{r}
+glimpse(df)
+```
+ All variables are of a continuous type except `review_texts` is chr.
+ 
+Check for missing values:
+
+```{r}
+map(df, ~sum(is.na(.)))
+```
+ Based on the missing values summary, we have a complete data set with no missing values for any column in the data frame.
+
+Check for duplicated cases:
+
+```{r}
+sum(duplicated(df))
+
+```
+
+## 1.2.1
+
+```{r}
+
+df |>
+   mutate(average_rating = factor(average_rating,
+                                  levels = c(1, 2, 3, 4, 5))) %>%
+  filter(!is.na(average_rating)) %>%  
+  count(average_rating) %>%  
+mutate(percent = n / sum(n) * 100) 
+```
+
+
+```{r}
+df %>%
+  mutate(average_rating = factor(average_rating, levels = c(1, 2, 3, 4, 5))) %>%
+  filter(!is.na(average_rating)) %>%  
+  count(average_rating) %>%  
+  mutate(percent = n / sum(n) * 100) %>%
+  ggplot(aes(x = average_rating, y = n, label = sprintf("%.1f%%", percent))) +  
+    geom_bar(stat = "identity", fill = "blue", color = "black") +
+    geom_text(vjust = -0.5, size = 3) +  
+    labs(title = "Distribution of average_rating - percentage", x = "average_rating", y = "Count") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+df <- df %>%
+  mutate( rating_label = factor(ifelse(average_rating > 3.7,"Good", "Bad")))
+
+
+```
+
+```{r}
+books <- df |> 
+      filter(rating_label =='Good') |>
+     select(book_id, average_rating, n_reviews)
+books
+```
+```{r}
+cor(books)
+```
+
+
+```{r}
+
+books_summary <-   %>%
+  group_by(rating_category = cut_width(average_rating, width = 0.1)) %>%
+  summarise(mean_reviews = mean(n_reviews))
+
+
+ggplot(books, aes(x = cut_width(average_rating, width = 0.1), y = n_reviews)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(title = "Average Number of Reviews by Rating Category",
+       x = "Average Rating Category for >3.5",
+       y = "Number of Reviews") +
+  theme_minimal(base_size = 14) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        plot.title = element_text(face = "bold")) +
+ 
+  geom_point(data = books_summary, aes(x = rating_category, y = mean_reviews), 
+             shape = 3, size = 3, color = "black", 
+             position = position_dodge(width = 0.80))
+
+
+```
+
+  A.1 We are going to split the data 20% testing 80% for traing:
+ 
+```{r, A}
+training_data <- select(df, -book_id, -review_texts,-average_rating)
+```
+
+- Data Balance Check
+```{r}
+training_data|>
+ggplot( aes(x=rating_label, fill=rating_label)) +
+  geom_bar(position="dodge", stat="count")+
+    geom_text(stat='count', aes(label=..count..),
+              position=position_dodge(width=0.9), 
+                                   vjust=-0.25) +
+  labs(title = 'Rating label based on threshold 3.7')
+
+```
+    The bar chart displays class distribution for rating_label: 10,279 "Bad" 
+and 15,195 "Good," totaling 25,474 instances, with a higher frequency of "Bad" ratings.
+
+## Step 2) Spliting The Data:
+```{r, B}
+set.seed(1234) 
+data_split <- initial_split(training_data, prop = 0.50)  
+train_data <- training(data_split)
+test_data <- testing(data_split)
+
+
+
+```
+
+We are going to use these module in our predicthions:
+ 1) : Generalized Linear Models
+ 2) : k-Nearest Neighbors
+ 3) : naive_bayes
+ 4) : Recursive Partitioning and Regression Trees
+ 5) : Support Vector Machines with Radial Basis Function as Kernel
+ 6) : Random Forest.
+
+```{r, c1}
+algorithmList <- c("glmnet", "knn", "naive_bayes", "rpart", "svmRadial", "rf")
+```
+
+### Define custom tuning grids for each model
+```{r}
+tuneGridList <- list(
+  glmnet = expand.grid(alpha = seq(0, 1, length = 5), lambda = 10^seq(-3, -1, length = 5)),
+  knn = expand.grid(k = seq(3, 21, by = 2)),
+  naive_bayes = expand.grid(laplace = c(0, 0.5, 1), usekernel = c(TRUE, FALSE), adjust = 1),
+  rpart = expand.grid(cp = seq(0.001, 0.1, length = 10)),
+  svmRadial = expand.grid(sigma = 10^seq(-3, 1, length = 5), C = 10^seq(-1, 1, length = 5)),
+  rf = expand.grid(mtry = c(sqrt(ncol(train_data)), ncol(train_data)/3, ncol(train_data)/2))
+)
+
+```
+
+
+
+###    Due to the presence of imbalanced classes in our dataset, we will employ the SMOTE technique alongside meticulous model tuning and cross-validation strategies. This will help counteract the effects of class imbalance and enhance the dependability of our model.
+```{r}
+#set.seed(1234)
+
+#control <- trainControl( savePredictions = "final",
+                       # classProbs = TRUE,
+                      #  summaryFunction = defaultSummary,
+                       # sampling = "smote",
+                       #search = "grid",
+                        #method = "repeatedcv",
+                        #number = 5,
+                        #repeats = 3,
+                     #  allowParallel = TRUE
+
+set.seed(1234)
+
+control <- trainControl(number=10,
+                        savePredictions = "final",
+                        classProbs = TRUE,
+                        summaryFunction = defaultSummary,
+                        sampling = "smote",
+                        allowParallel = TRUE)
+
+
+
+```
+
+
+
+## Step 3)  Train and tune each model
+```{r}
+
+set.seed(1234)
+Modules <- caretList( rating_label ~ .,
+                      data = train_data,
+                      trControl = control,
+                      methodList = algorithmList)
+
+Modules   
+
+
+```
+#### Save the aLL modelS pREDICTIONS
+```{r}
+saveRDS(Modules, "C:/Users/ETI/Desktop/Data Mining/Final Project/Modules.rds")
+
+```
+
+```{r}
+loaded_model <- readRDS("C:\Users\ETI\Desktop\Data Mining\Final Project\Modules.rds")
+
+```
+
+
+
+
+## All modules predictions:
+
+```{r}
+confusion_matrices <- list()
+for (model_name in algorithmList) {
+  predictions <- predict(Modules[[model_name]], test_data)
+  predictions <- factor(predictions, levels = levels(test_data$rating_label))
+  confMatrix <- confusionMatrix(predictions, test_data$rating_label)
+  confusion_matrices[[model_name]] <- confMatrix
+}
+```
+
+## calculating AUC Values for all modules:
+
+```{r}
+performance_metrics <- data.frame(Model = algorithmList, Accuracy = NA, Precision = NA, Recall = NA, F1 = NA, AUC = NA)
+
+# Calculate metrics for each model
+for (model_name in algorithmList) {
+  conf_matrix <- confusion_matrices[[model_name]]
+  # Calculate precision, recall, F1, and AUC
+  accuracy <- conf_matrix$overall['Accuracy']
+  
+ 
+  if (!is.null(conf_matrix$byClass)) {
+    precision <- conf_matrix$byClass['Pos Pred Value'][1]
+    recall <- conf_matrix$byClass['Sensitivity'][1]
+    F1 <- ifelse(precision + recall > 0, 2 * precision * recall / (precision + recall), NA)
+  } else {
+    precision <- NA
+    recall <- NA
+    F1 <- NA
+  }
+  
+  predicted_probabilities <- predict(Modules[[model_name]], 
+                                     test_data, type = "prob")[,"Good"]
+  
+  auc_value <- pROC::roc(response = test_data$rating_label, 
+                         predictor = predicted_probabilities)$auc
+
+ 
+  performance_metrics[performance_metrics$Model == model_name, c("Accuracy", "Precision", "Recall", "F1", "AUC")] <- c(accuracy, precision, recall, F1, auc_value)
+
+  
+}
+```
+
+### The table results:
+```{r}
+print(performance_metrics)
+```
+
+### F-score:
+
+```{r}
+performance_metrics |>
+ggplot( aes(x = Model, y = F1, fill = Model)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(title = "F1 Scores of Classification Models", x = "Model", y = "F1 Score")
+```
+
+### AUC
+
+```{r}
+performance_metrics |>
+ggplot( aes(x = Model, y = AUC, fill = Model)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(title = "AUC Scores of Classification Models", x = "Model", y = "AUC Score")
+```
+
+Step 4) Training The Data:
+
+The primary goal of this approach is to systematically evaluate and compare the performance of various configurations of key machine learning models—namely
+k-Nearest Neighbors (kNN), Decision Trees, and Support Vector Machines (SVM)—on
+a given dataset. By exploring different parameters and variations of these
+models (such as the number of neighbors in kNN, pruning in Decision Trees, 
+and kernel types in SVM), the aim is to identify the most effective model configurations that yield the highest accuracy, generalizability, 
+and predictive performance for our specific task. This comparative 
+analysis will enable us to make informed decisions about which model
+variants are best suited to our data and predictive objectives, 
+ultimately enhancing the robustness and reliability of 
+our machine learning solution.
+
+## A)Models Variants:
+
+### k-nearest
+
+```{r}
+knn1 <- train(rating_label ~ ., data=train_data, method="knn", 
+              tuneGrid=expand.grid(k=1), trControl=control)
+
+knn3 <- train(rating_label ~ ., data=train_data, method="knn",
+              tuneGrid=expand.grid(k=3), trControl=control)
+
+knn5 <- train(rating_label ~ ., data=train_data, method="knn", 
+              tuneGrid=expand.grid(k=5), trControl=control)
+```
+
+## B) Decision Tree Variants:
+
+```{r}
+tree_default <- train(rating_label ~ ., 
+                      data=train_data, method="rpart",
+                      trControl=control)
+
+tree_pruned <- train(rating_label ~ ., 
+                     data=train_data, 
+                     method="rpart", 
+                     tuneGrid=data.frame(cp=c(0.01)), 
+                     trControl=control)
+```
+##c) SVM Variants:
+
+```{r}
+svm_linear <- train(rating_label ~ ., data=train_data, method="svmLinear", trControl=control)
+svm_rbf <- train(rating_label ~ ., data=train_data, method="svmRadial", tuneGrid=expand.grid(sigma=c(0.05), C=c(1)), trControl=control)
+```
+
+
+## D) Gathering the variances of the models into one list.
+
+```{r, }
+models2 <- list(knn1 = knn1, knn3 = knn3, 
+                knn5 = knn5, 
+                tree_default = tree_default, 
+                tree_pruned = tree_pruned
+               # svm_linear = svm_linear, 
+               # svm_rbf = svm_rbf
+               )
+```
+
+## E) confusion_matrices FOR Models Variants:
+
+```{r}
+confusion_matrices <- list()
+
+
+for (model_name in names(models2)) {
+  
+  predictions <- predict(models2[[model_name]], newdata = test_data)
+ 
+  predictions <- factor(predictions, 
+                        levels =   levels(test_data$rating_label))
+  
+  confMatrix <- confusionMatrix(predictions, test_data$rating_label)
+
+  confusion_matrices[[model_name]] <- confMatrix
+}
+```
+
+## F) preduse the Accuracy for all Models Variants:
+
+```{r}
+summary_table <- data.frame(Model = character(),
+                            Accuracy = numeric(),
+                            stringsAsFactors = FALSE)
+
+
+for(model_name in names(confusion_matrices)) { 
+
+  conf_matrix <- confusion_matrices[[model_name]]
+  
+  
+  accuracy <- conf_matrix$overall['Accuracy']
+  
+  
+  summary_table <- bind_rows(summary_table, data.frame(Model = model_name, 
+                                                       Accuracy = accuracy))
+}
+
+
+summary_table <- summary_table %>%
+  arrange(desc(Accuracy))
+
+
+print(summary_table)
+```
+
+## Preduce ROC Curve for Each model:
+```{r}
+positive_class_level <- levels(test_data$rating_label)[2]  
+
+# Generate ROC data for all models
+roc_data_list <- lapply(names(models2), function(model_name) {
+  # Predict probabilities for the positive class
+  predictions <- predict(models2[[model_name]], test_data, type = "prob")
+  
+  # Extract the probabilities for the positive class
+  positive_class_prob <- predictions[, positive_class_level]
+  
+  # Calculate the ROC curve
+  roc_curve <- roc(response = test_data$rating_label, predictor = positive_class_prob)
+  
+  # Extract the TPR and FPR for plotting
+  data.frame(
+    TPR = roc_curve$sensitivities,
+    FPR = 1 - roc_curve$specificities, # Adjust to have FPR instead of specificity
+    Model = model_name
+  )
+})
+
+# Combine the ROC data from all models
+roc_data <- do.call(rbind, roc_data_list)
+# Convert 'Model' to a factor for proper facetting
+roc_data$Model <- factor(roc_data$Model, levels = names(models2))
+
+roc_data|>
+ggplot( aes(x = FPR, y = TPR, color = Model)) + 
+  geom_line() +
+  geom_abline(linetype = "dashed") +  # Add diagonal dashed line for chance level
+  facet_wrap(~ Model, scales = "free") +
+  labs(x = "False Positive Rate", y = "True Positive Rate", title = "ROC Curves for Each Model") +
+  theme_minimal()
+```
+```{r}
+positive_class_level <- levels(test_data$rating_label)[2]  
+
+# Generate ROC data for models in models2
+roc_data_list_models2 <- lapply(names(models2), function(model_name) {
+  predictions <- predict(models2[[model_name]], test_data, type = "prob")
+  positive_class_prob <- predictions[, positive_class_level]
+  roc_curve <- roc(response = test_data$rating_label, predictor = positive_class_prob)
+  data.frame(TPR = roc_curve$sensitivities,
+             FPR = 1 - roc_curve$specificities,
+             Model = model_name)
+})
+
+# Generate ROC data for models in Modules
+roc_data_list_Modules <- lapply(names(Modules), function(model_name) {
+  predictions <- predict(Modules[[model_name]], test_data, type = "prob")
+  positive_class_prob <- predictions[, positive_class_level]
+  roc_curve <- roc(response = test_data$rating_label, predictor = positive_class_prob)
+  data.frame(TPR = roc_curve$sensitivities,
+             FPR = 1 - roc_curve$specificities,
+             Model = model_name)
+})
+
+# Combine the ROC data from both sets of models
+roc_data <- do.call(rbind, c(roc_data_list_models2, roc_data_list_Modules))
+
+# Convert 'Model' to a factor to include all models in the plot
+roc_data$Model <- factor(roc_data$Model, levels = c(names(models2), names(Modules)))
+
+roc_data|>
+ggplot( aes(x = FPR, y = TPR, color = Model)) + 
+  geom_line() +
+  geom_abline(linetype = "dashed") +  # Add diagonal dashed line for chance level
+  labs(x = "False Positive Rate", y = "True Positive Rate", title = "ROC Curves for All Models") +
+  theme_minimal() +
+  theme(legend.position = "bottom")  # Adjust legend position
+
+```
+
